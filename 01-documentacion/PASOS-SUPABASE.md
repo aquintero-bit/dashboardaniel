@@ -27,18 +27,19 @@ select count(*) from app.jefaturas;      -- debe dar 0 antes de la semilla
 
 ## 3. Correr la semilla
 
-Antes, editar en `03-semilla/seed.mjs`:
+La semilla hace tres cosas: invita al **administrador** (recibe un correo y elige su
+contraseña), registra el catálogo inicial de marcas y las clasifica como nacionales o
+internacionales. **No crea más usuarios**: gerencia, jefes y compradores los crea el
+administrador desde el módulo, con sus roles, jefaturas y marcas.
 
-- `USUARIOS` → correos, nombres y roles reales
-- `CLASIFICACION` → qué marcas son nacionales y cuáles internacionales
-
-Luego:
+Antes, revisar en `03-semilla/seed.mjs` la lista `CLASIFICACION`. Luego:
 
 ```bash
 cd 03-semilla
 npm install
 SUPABASE_URL=https://TU-PROYECTO.supabase.co \
 SUPABASE_SERVICE_ROLE=eyJ... \
+ADMIN_EMAIL=quien.administra@febeca.com \
 node seed.mjs [ruta/al/export-marcas-del-SIM.xlsx]
 ```
 
@@ -50,6 +51,14 @@ La **service role key** está en Settings → API, marcada como secreta.
 El argumento del xlsx es opcional: es la exportación del SIM con `Parameter = Marca`, sin
 filtro, 12 meses, `Venta Neta`. Sin él, solo registra las marcas de `CLASIFICACION`.
 
+> El correo de invitación sale por el SMTP por defecto de Supabase, que solo entrega a los
+> correos del equipo del proyecto y con límite de pocos envíos por hora. Para invitar a
+> gente fuera del equipo hay que configurar un SMTP propio en Authentication → SMTP.
+
+**Estado (21-sep-2026):** el catálogo y la clasificación ya están cargados en el proyecto
+(31 marcas). Falta solo invitar al administrador: correr la semilla igual, es idempotente
+sobre las marcas.
+
 ## 4. Abrir el módulo de administración
 
 Abrir `04-frontend/febeca-admin.jsx`. Pide:
@@ -57,7 +66,7 @@ Abrir `04-frontend/febeca-admin.jsx`. Pide:
 - **Project URL** (Settings → API)
 - **anon public key** (Settings → API; esta sí es pública)
 
-Entrar con el correo y contraseña del admin definido en la semilla.
+Entrar con el correo del administrador y la contraseña que definió desde el correo de invitación.
 
 ## Verificación final
 

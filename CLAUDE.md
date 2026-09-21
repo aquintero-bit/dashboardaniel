@@ -55,7 +55,7 @@ Archivos xlsx del SIM para pruebas: `data (23)` artículos USD 48m · `data (39)
   Supabase real todavía.
 - Parser de xlsx del SIM: detecta tipo de archivo, descarta subtotales, normaliza a filas largas.
 - Motor de pronósticos y pedido sugerido en el cliente.
-- Semilla escrita, no ejecutada.
+- Semilla: invita solo al admin y carga el catálogo. La parte de marcas ya se ejecutó.
 
 - **Consolidado aplicado en Supabase real** (21-sep-2026, proyecto `khiuxmkhiuxqmxpurkqv`,
   Postgres 17): 14 tablas, 16 vistas, 2 materializadas, 41 funciones, trigger sobre
@@ -63,9 +63,13 @@ Archivos xlsx del SIM para pruebas: `data (23)` artículos USD 48m · `data (39)
   Editor). Cerrado el hueco de `indicadores` (no tenía RLS y `authenticated` podía escribir);
   prueba 23 del test local lo cubre.
 
+- `app` expuesto en PostgREST. Catálogo inicial cargado: 31 marcas clasificadas (20
+  internacionales, 11 nacionales), equivalente a los pasos 2 y 3 de `seed.mjs`.
+
 **Pendiente**
-- Agregar `app` a Exposed schemas (Settings → API). Sin eso, PostgREST da 404.
-- Correr `seed.mjs` con los usuarios reales (ver `PASOS-SUPABASE.md`, paso 3).
+- Invitar al administrador (`seed.mjs` con `ADMIN_EMAIL`, o Authentication → Users → Invite
+  en el panel y luego `update app.perfiles set rol='admin'`). Los demás usuarios los crea el
+  administrador desde el módulo; la semilla ya no trae usuarios ni contraseñas fijas.
 
 ## Tareas siguientes, en orden
 
@@ -111,7 +115,8 @@ escribir en `app.pronosticos` marcando los anteriores `vigente = false`. Primera
 cliente; después mover a Edge Function con Database Webhook sobre `app.cargas` (`estado='ok'`).
 
 ### 6. Producción
-- Edge Function `invitar-usuario` con `auth.admin.inviteUserByEmail` (hoy es signup).
+- Edge Function `invitar-usuario` con `auth.admin.inviteUserByEmail` (hoy el módulo usa
+  signup; la semilla ya invita). Requiere SMTP propio para correos fuera del equipo.
 - `pg_cron` diario: cargas en `procesando` > 24 h → `error`.
 - SSO Azure AD si Febeca usa Microsoft 365.
 - `.pptx` nativo con pptxgenjs para el exportador de cierre.

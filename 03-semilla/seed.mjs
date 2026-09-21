@@ -6,26 +6,27 @@
 //
 //    SUPABASE_URL=https://xxxx.supabase.co \
 //    SUPABASE_SERVICE_ROLE=eyJ... \
+//    ADMIN_EMAIL=quien.administra@febeca.com \
 //    node seed.mjs [ruta/al/export-marcas-del-SIM.xlsx]
+//
+//  Solo crea la cuenta del administrador (por invitación: recibe un correo
+//  y elige su contraseña). El resto de usuarios, jefes y asignaciones se
+//  hacen desde el módulo de administración (febeca-admin.jsx).
 // ════════════════════════════════════════════════════════════════════════
 import { createClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
 import fs from "node:fs";
 
-const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE;
-if (!url || !key) { console.error("Faltan SUPABASE_URL y SUPABASE_SERVICE_ROLE"); process.exit(1); }
+const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE, adminEmail = process.env.ADMIN_EMAIL;
+if (!url || !key || !adminEmail) { console.error("Faltan SUPABASE_URL, SUPABASE_SERVICE_ROLE y ADMIN_EMAIL"); process.exit(1); }
 
 const sb = createClient(url, key, { auth: { persistSession: false }, db: { schema: "app" } });
 
 // ── 1. Usuarios ─────────────────────────────────────────────────────────
-//  Edita esta lista. La contraseña inicial se debe cambiar en el primer
-//  ingreso; también puedes usar inviteUserByEmail en vez de createUser.
+//  Solo el administrador inicial. Los demás (gerencia, jefes, compradores)
+//  los crea el administrador desde el módulo, con sus roles y marcas.
 const USUARIOS = [
-  { email: "admin@febeca.com",       nombre: "Administrador",      rol: "admin",        pass: "Cambiar.2026!" },
-  { email: "gerencia@febeca.com",    nombre: "Gerencia Compras",   rol: "gerencia",     pass: "Cambiar.2026!" },
-  { email: "jefe.intl@febeca.com",   nombre: "Jefe Internacional", rol: "jefe_compras", pass: "Cambiar.2026!", jefatura: "internacional" },
-  { email: "jefe.nac@febeca.com",    nombre: "Jefe Nacional",      rol: "jefe_compras", pass: "Cambiar.2026!", jefatura: "nacional" },
-  { email: "adriana@febeca.com",     nombre: "Adriana",            rol: "comprador",    pass: "Cambiar.2026!", marcas: ["PCP"] },
+  { email: adminEmail, nombre: "Administrador", rol: "admin" },
 ];
 
 // ── 2. Clasificación inicial de marcas (el resto queda pendiente) ───────
@@ -40,13 +41,11 @@ async function crearUsuario(u) {
   const { data: lista } = await sb.auth.admin.listUsers({ perPage: 1000 });
   let user = lista.users.find((x) => x.email === u.email);
   if (!user) {
-    const { data, error } = await sb.auth.admin.createUser({
-      email: u.email, password: u.pass, email_confirm: true,
-      user_metadata: { nombre: u.nombre },
-    });
+    // Invitación: el usuario recibe un correo y define su propia contraseña.
+    const { data, error } = await sb.auth.admin.inviteUserByEmail(u.email, { data: { nombre: u.nombre } });
     if (error) throw error;
     user = data.user;
-    console.log(`  + ${u.email}`);
+    console.log(`  + ${u.email} (invitación enviada)`);
   } else console.log(`  = ${u.email} (ya existía)`);
   ids[u.email] = user.id;
   // El trigger crea el perfil con 'lectura'; aquí se pone el rol real.
@@ -147,6 +146,6 @@ async function main() {
   console.log("\nEstado de marcas:");
   const { data: est } = await sb.from("v_marcas").select("codigo,origen,estado,responsables").order("codigo");
   for (const m of est) console.log(`   ${m.codigo.padEnd(18)} ${String(m.origen ?? "—").padEnd(14)} ${m.estado.padEnd(16)} ${m.responsables ?? ""}`);
-  console.log("\nListo. Cambia las contraseñas iniciales en el primer ingreso.");
+  console.log("\nListo. El administrador define su contraseña desde el correo de invitación y crea al resto de usuarios en el módulo.");
 }
 main().catch((e) => { console.error("\nERROR:", e.message ?? e); process.exit(1); });

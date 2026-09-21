@@ -30,15 +30,16 @@ Sin esto, todas las llamadas devuelven 404 aunque el esquema esté perfecto. Es 
 npm install
 SUPABASE_URL=https://xxxx.supabase.co \
 SUPABASE_SERVICE_ROLE=eyJ... \
+ADMIN_EMAIL=quien.administra@febeca.com \
 node seed.mjs ruta/al/export-marcas-del-SIM.xlsx
 ```
 
 La **service role key** está en Settings → API. Nunca va al frontend ni al repositorio.
 
-Antes de correrla, edita en `seed.mjs`:
-- `USUARIOS`: correos, nombres y roles reales. Las contraseñas iniciales se cambian al entrar.
-- `CLASIFICACION`: qué marcas son nacionales y cuáles internacionales. Las que no estén en la lista
-  quedan pendientes y se clasifican desde el módulo de administración.
+La semilla invita al administrador por correo (él define su contraseña), registra el
+catálogo de marcas y las clasifica. Los demás usuarios los crea el administrador desde el
+módulo de administración. Antes de correrla, revisa en `seed.mjs` la lista `CLASIFICACION`:
+las marcas que no estén quedan pendientes y se clasifican desde el módulo.
 
 El argumento opcional es la exportación del SIM con `Parameter = Marca`, sin filtro, 12 meses,
 `Venta Neta`. Si no lo pasas, solo registra las marcas de la clasificación.
