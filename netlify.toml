@@ -1,0 +1,16 @@
+# Despliegue del módulo de administración en Netlify.
+# Conectar el repositorio en app.netlify.com → "Import from Git"; esta configuración hace el resto.
+[build]
+  base    = "04-frontend"
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

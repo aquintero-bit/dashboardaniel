@@ -10,12 +10,26 @@ El contexto completo del proyecto está en `contexto-dashboard-febeca.md`.
                       problema del enum, ya corregido en el consolidado)
    pruebas/           Test de RLS (24 puntos) con 7 usuarios y stub para correrlo en Postgres local
 03-semilla/           seed.mjs: usuarios, roles, jefes, catálogo y asignaciones iniciales
-04-frontend/          febeca-admin.jsx                 → administración (conectado a Supabase)
+04-frontend/          Proyecto Vite: npm install && npm run dev (ver abajo)
+                      febeca-admin.jsx                 → administración (conectado a Supabase)
                       febeca-dashboard-inteligente.jsx → 7 pestañas con datos reales de PCP
                       dashboard-compras-febeca.jsx     → parser funcional de los xlsx del SIM
                       febeca-pcp-ejecutivo.jsx         → tablero ejecutivo, versión anterior
 05-datos-referencia/  243 marcas del maestro de materiales (snapshot 2023, solo referencia)
 ```
+
+## Correr la app
+
+```bash
+cd 04-frontend
+npm install
+npm run dev        # abre http://localhost:5173
+npm run build      # genera dist/ para publicar
+```
+
+Publicación: conectar este repositorio en [Netlify](https://app.netlify.com) → "Import from Git".
+`netlify.toml` ya trae la configuración. Después, en Supabase → Authentication → URL
+Configuration, poner la dirección de Netlify como Site URL.
 
 ## Probar la base en local sin Supabase
 

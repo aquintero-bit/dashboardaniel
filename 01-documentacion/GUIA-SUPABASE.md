@@ -46,7 +46,9 @@ El argumento opcional es la exportación del SIM con `Parameter = Marca`, sin fi
 
 ## 5. Abrir el módulo de administración
 
-`febeca-admin.jsx` pide **Project URL** y **anon public key** (Settings → API) y luego el login.
+La URL del proyecto y la anon key ya van fijas en `febeca-admin.jsx` (constantes `SUPABASE_URL`
+y `SUPABASE_ANON`). La app abre directo en el login. Para correrla: `cd 04-frontend && npm
+install && npm run dev`, o publicarla en Netlify (ver `LEEME.md`).
 
 Lo que ve cada rol:
 

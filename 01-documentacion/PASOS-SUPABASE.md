@@ -61,10 +61,9 @@ sobre las marcas.
 
 ## 4. Abrir el módulo de administración
 
-Abrir `04-frontend/febeca-admin.jsx`. Pide:
-
-- **Project URL** (Settings → API)
-- **anon public key** (Settings → API; esta sí es pública)
+La URL del proyecto y la anon key ya están fijas en `04-frontend/febeca-admin.jsx`. Para abrir
+el módulo: `cd 04-frontend && npm install && npm run dev`, o la dirección de Netlify una vez
+publicado.
 
 Entrar con el correo del administrador y la contraseña que definió desde el correo de invitación.
 

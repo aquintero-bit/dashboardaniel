@@ -23,7 +23,11 @@ Marca piloto: **PCP**. Usuarios: compradores, dos jefes de compras, gerencia, ad
 - **Parseo de xlsx:** en el navegador con SheetJS (`xlsx`), en un Web Worker. Nunca en servidor.
 - **Pronósticos:** Holt-Winters en JS (ya implementado en `febeca-dashboard-inteligente.jsx`).
   Destino final: Edge Function disparada por webhook. Hoy corre en el cliente.
-- **Despliegue:** Netlify (web estática). Persistencia en Supabase, no en IndexedDB.
+- **Armado:** Vite + `@vitejs/plugin-react` + Tailwind v4 (`@tailwindcss/vite`), en `04-frontend/`.
+  `npm run dev` para desarrollar, `npm run build` genera `dist/`. El punto de entrada es
+  `src/main.jsx`, que hoy monta `febeca-admin.jsx`.
+- **Despliegue:** Netlify (web estática) leyendo `netlify.toml` de la raíz: base `04-frontend`,
+  publica `dist`. Persistencia en Supabase, no en IndexedDB.
 
 ## Mapa del repositorio
 
@@ -39,6 +43,7 @@ Marca piloto: **PCP**. Usuarios: compradores, dos jefes de compras, gerencia, ad
   pruebas/febeca-test-rls.sql     ← 24 comprobaciones de permisos con 7 usuarios
 03-semilla/seed.mjs               ← usuarios, roles, jefes, catálogo, asignaciones (service role)
 04-frontend/
+  package.json, vite.config.js, index.html, src/main.jsx, src/estilos.css ← armado Vite
   febeca-admin.jsx                ← módulo de administración CONECTADO a Supabase
   dashboard-compras-febeca.jsx    ← parser funcional de xlsx del SIM (datos en memoria)
   febeca-dashboard-inteligente.jsx← 7 pestañas, datos de PCP embebidos, Holt-Winters
@@ -104,8 +109,12 @@ jefe, Actividad carga el feed, recarga sin pedir contraseña, con el token venci
 y cerrar sesión limpia el almacenamiento. Sin errores de JS.
 **Falta**: probar con usuarios de rol jefe_compras, comprador y lectura (solo existe el admin).
 Cuando se creen, verificar pestañas por rol y el flujo clasificar → asignar → suplencia → feed.
-Para correr el módulo en local sin bundler propio: `esbuild` con `--jsx=automatic` y un
-`index.html` con el CDN de Tailwind bastan (React 18, xlsx 0.18, lucide-react).
+Correr en local: `cd 04-frontend && npm install && npm run dev`. El build de producción
+(`npm run build` + `vite preview`) pasó la misma prueba de navegador.
+**Pendiente de despliegue:** conectar el repo en Netlify (el `netlify.toml` ya está) y, con la
+dirección resultante, poner en Supabase Authentication → URL Configuration la Site URL (hoy
+`http://localhost:3000`) y agregarla a Redirect URLs, o los correos de invitación y
+recuperación llevarán a un sitio inexistente.
 
 **Ojo con el registro de usuarios desde el módulo:** usa `/auth/v1/signup` y el proyecto
 tiene confirmación de correo activada (`mailer_autoconfirm = false`). El SMTP por defecto de
