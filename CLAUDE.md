@@ -32,7 +32,7 @@ Marca piloto: **PCP**. Usuarios: compradores, dos jefes de compras, gerencia, ad
   febeca-supabase-consolidado.sql ← LA FUENTE DE VERDAD del esquema. Se aplica completo.
   migraciones/001..006            ← historia, solo referencia. NO aplicar por separado.
   pruebas/febeca-stub-local.sql   ← simula auth/storage para Postgres local
-  pruebas/febeca-test-rls.sql     ← 22 comprobaciones de permisos con 7 usuarios
+  pruebas/febeca-test-rls.sql     ← 24 comprobaciones de permisos con 7 usuarios
 03-semilla/seed.mjs               ← usuarios, roles, jefes, catálogo, asignaciones (service role)
 04-frontend/
   febeca-admin.jsx                ← módulo de administración CONECTADO a Supabase
@@ -49,7 +49,7 @@ Archivos xlsx del SIM para pruebas: `data (23)` artículos USD 48m · `data (39)
 ## Estado actual
 
 **Hecho y probado**
-- Esquema consolidado: corre limpio en Postgres 16 con el stub. 22/22 pruebas de RLS pasan.
+- Esquema consolidado: corre limpio en Postgres 16 con el stub. 24/24 pruebas de RLS pasan.
 - Módulo de administración: usuarios, roles, marcas, clasificación, asignaciones con vigencia,
   suplencias, jefaturas, feed de actividad, equipo. Sintaxis validada, no probado contra un
   Supabase real todavía.
@@ -66,10 +66,12 @@ Archivos xlsx del SIM para pruebas: `data (23)` artículos USD 48m · `data (39)
 - `app` expuesto en PostgREST. Catálogo inicial cargado: 31 marcas clasificadas (20
   internacionales, 11 nacionales), equivalente a los pasos 2 y 3 de `seed.mjs`.
 
+- Administrador creado y con rol `admin`. Login por password grant probado. Los demás usuarios
+  los crea el administrador; la semilla ya no trae usuarios ni contraseñas fijas.
+
 **Pendiente**
-- Invitar al administrador (`seed.mjs` con `ADMIN_EMAIL`, o Authentication → Users → Invite
-  en el panel y luego `update app.perfiles set rol='admin'`). Los demás usuarios los crea el
-  administrador desde el módulo; la semilla ya no trae usuarios ni contraseñas fijas.
+- Crear gerencia, los dos jefes y los compradores (ver nota de SMTP en la tarea 2).
+- Probar el módulo en el navegador con esos roles.
 
 ## Tareas siguientes, en orden
 
@@ -84,10 +86,23 @@ select count(*) from app.jefaturas;      -- 0 antes de la semilla
 Las vistas `v_*` de administración filtran por rol del usuario autenticado: desde el SQL
 Editor (sin usuario) devuelven vacío. No es un error; verificar con las tablas directas.
 
-### 2. Probar `febeca-admin.jsx` contra Supabase real
-Login → cada rol ve sus pestañas → clasificar marca → asignar → suplencia → feed. Anotar
-cualquier diferencia entre PostgREST real y lo que el cliente espera (nombres de parámetros
-de RPC, forma de los errores).
+### 2. Probar `febeca-admin.jsx` contra Supabase real — HECHO como admin (21-sep-2026)
+Probado por API con el token del admin, no en el navegador: las 12 lecturas del módulo
+responden 200 con las columnas esperadas, el patch de `perfiles` funciona, los nombres de
+parámetros de las 10 RPC coinciden con las firmas reales, y los errores llegan como
+`{code, message, hint}` que `leer()` ya interpreta. Anon sin login obtiene 0 filas.
+Hallazgo corregido: `reasignar_marca` tenía una sobrecarga vieja de 3 parámetros (migración
+002) que hacía que PostgREST devolviera 300 (PGRST203) al llamarla con 3 argumentos. Se
+elimina en el consolidado; prueba 24 vigila que no haya sobrecargas en `app`.
+**Falta**: probar en el navegador con usuarios de rol jefe_compras, comprador y lectura (solo
+existe el admin). Cuando se creen, verificar pestañas por rol y el flujo clasificar → asignar
+→ suplencia → feed.
+
+**Ojo con el registro de usuarios desde el módulo:** usa `/auth/v1/signup` y el proyecto
+tiene confirmación de correo activada (`mailer_autoconfirm = false`). El SMTP por defecto de
+Supabase solo entrega a los correos del equipo del proyecto y con límite por hora. Mientras
+no haya SMTP propio, crear los usuarios en Authentication → Users → Add user (con
+"Auto Confirm") y después asignar rol y marcas desde el módulo.
 
 ### 3. Conectar el parser con la ingesta
 Tomar `leerHojaSim` y `clasificar` de `dashboard-compras-febeca.jsx` y enchufarlos a:

@@ -8,7 +8,7 @@ El contexto completo del proyecto está en `contexto-dashboard-febeca.md`.
 02-base-de-datos/     febeca-supabase-consolidado.sql → pegar completo en el SQL Editor
    migraciones/       Las seis migraciones originales, por referencia (la 002 tiene el
                       problema del enum, ya corregido en el consolidado)
-   pruebas/           Test de RLS con 7 usuarios y stub para correrlo en Postgres local
+   pruebas/           Test de RLS (24 puntos) con 7 usuarios y stub para correrlo en Postgres local
 03-semilla/           seed.mjs: usuarios, roles, jefes, catálogo y asignaciones iniciales
 04-frontend/          febeca-admin.jsx                 → administración (conectado a Supabase)
                       febeca-dashboard-inteligente.jsx → 7 pestañas con datos reales de PCP
@@ -26,7 +26,7 @@ psql -d febeca_test -f 02-base-de-datos/febeca-supabase-consolidado.sql
 psql -d febeca_test -f 02-base-de-datos/pruebas/febeca-test-rls.sql
 ```
 
-Los 22 puntos deben salir como se describe en cada `\echo`.
+Los 24 puntos deben salir como se describe en cada `\echo`.
 
 ## Orden de trabajo pendiente
 

@@ -120,3 +120,6 @@ set role anon;
 select count(*) || ' indicadores visibles para anon' from app.indicadores;
 reset role;
 select 'factor_escala venta_neta sigue en ' || factor_escala from app.indicadores where codigo='venta_neta';
+
+\echo '24. ninguna función sobrecargada en app (PostgREST no resuelve sobrecargas):'
+select coalesce(string_agg(proname, ','), 'ninguna') from (select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app' group by 1 having count(*)>1) s;

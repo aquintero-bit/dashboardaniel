@@ -1299,6 +1299,10 @@ $$;
 
 -- Traspaso permanente: se le cierra al saliente y se le abre al entrante
 -- el mismo día, sin solape y sin hueco.
+-- La versión de 3 parámetros (migración 002) se elimina: si convive con las de
+-- 5 parámetros, PostgREST no puede elegir entre ellas y devuelve 300 (PGRST203).
+drop function if exists app.reasignar_marca(uuid, uuid, uuid);
+
 create or replace function app.reasignar_marca(
   p_marca_id  uuid,
   p_nuevo_id  uuid,
