@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+/* Tailwind v4 solo genera las clases que encuentra en el código: se le indica dónde mirar. */
+@source "../febeca-admin.jsx";
+@source "../index.html";
