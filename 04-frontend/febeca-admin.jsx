@@ -14,13 +14,20 @@ import {
      · febeca-supabase-consolidado.sql aplicado
    ══════════════════════════════════════════════════════════════════════ */
 
+/* ── Proyecto Supabase ──────────────────────────────────────────────────
+   La anon key es pública por diseño: RLS decide qué ve cada usuario. La
+   service_role NUNCA va aquí. Si cambias de proyecto, cambia estas dos. */
+const SUPABASE_URL = "https://khiuxmkhiuxqmxpurkqv.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoaXV4bWtoaXV4cW14cHVya3F2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0Mjg1NjEsImV4cCI6MjEwNTAwNDU2MX0.0HFoXieHYnKzy_3m1dnyOWLZSXkdIdpovKwvz6hPC5Y";
+const CLAVE_SESION = "febeca.sesion";
+
 /* ── Cliente mínimo de Supabase ─────────────────────────────────────── */
 function crearApi(url, anon) {
-  let token = null;
+  let sesion = null; // { access_token, refresh_token, expires_at (segundos epoch), user }
   const base = url.replace(/\/+$/, "");
   const cab = (extra = {}) => ({
     apikey: anon,
-    Authorization: "Bearer " + (token || anon),
+    Authorization: "Bearer " + (sesion?.access_token || anon),
     "Content-Type": "application/json",
     ...extra,
   });
@@ -31,19 +38,58 @@ function crearApi(url, anon) {
     if (!res.ok) {
       const m = data?.message || data?.msg || data?.error_description || data?.error || res.statusText;
       const hint = data?.hint ? " · " + data.hint : "";
-      throw new Error((m || "Error") + hint);
+      const e = new Error((m || "Error") + hint); e.status = res.status; throw e;
     }
     return data;
   }
+  function guardar(d) {
+    sesion = d ? { access_token: d.access_token, refresh_token: d.refresh_token, expires_at: d.expires_at, user: d.user } : null;
+    try { d ? localStorage.setItem(CLAVE_SESION, JSON.stringify(sesion)) : localStorage.removeItem(CLAVE_SESION); } catch { /* sin almacenamiento */ }
+  }
+  async function renovar() {
+    if (!sesion?.refresh_token) return false;
+    const r = await fetch(base + "/auth/v1/token?grant_type=refresh_token", {
+      method: "POST", headers: { apikey: anon, "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: sesion.refresh_token }),
+    });
+    if (!r.ok) { guardar(null); return false; }
+    guardar(await r.json()); return true;
+  }
+  // Toda llamada autenticada pasa por aquí: renueva antes de que venza y
+  // reintenta una vez si el servidor responde 401.
+  async function autenticado(hacer) {
+    if (sesion && sesion.expires_at * 1000 - Date.now() < 60_000) await renovar();
+    try { return await leer(await hacer()); }
+    catch (e) {
+      if (e.status === 401 && (await renovar())) return leer(await hacer());
+      throw e;
+    }
+  }
   return {
-    get token() { return token; },
-    setToken(t) { token = t; },
+    get usuario() { return sesion?.user || null; },
+    async restaurar() {
+      let g = null;
+      try { g = JSON.parse(localStorage.getItem(CLAVE_SESION) || "null"); } catch { g = null; }
+      if (!g?.access_token) return null;
+      sesion = g;
+      if (sesion.expires_at * 1000 - Date.now() < 60_000 && !(await renovar())) return null;
+      // Confirma que el token sigue siendo válido en el servidor.
+      const r = await fetch(base + "/auth/v1/user", { headers: { apikey: anon, Authorization: "Bearer " + sesion.access_token } });
+      if (!r.ok) { if (!(await renovar())) return null; }
+      return sesion.user;
+    },
     async login(email, password) {
       const r = await fetch(base + "/auth/v1/token?grant_type=password", {
         method: "POST", headers: { apikey: anon, "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const d = await leer(r); token = d.access_token; return d;
+      const d = await leer(r); guardar(d); return d;
+    },
+    async salir() {
+      if (sesion?.access_token) {
+        try { await fetch(base + "/auth/v1/logout", { method: "POST", headers: cab() }); } catch { /* ya no importa */ }
+      }
+      guardar(null);
     },
     async signup(email, password, nombre) {
       const r = await fetch(base + "/auth/v1/signup", {
@@ -52,25 +98,30 @@ function crearApi(url, anon) {
       });
       return leer(r);
     },
-    async select(rel, q = "select=*") {
-      const r = await fetch(base + "/rest/v1/" + rel + "?" + q, { headers: cab({ "Accept-Profile": "app" }) });
-      return leer(r);
+    select(rel, q = "select=*") {
+      return autenticado(() => fetch(base + "/rest/v1/" + rel + "?" + q, { headers: cab({ "Accept-Profile": "app" }) }));
     },
-    async rpc(fn, args = {}) {
-      const r = await fetch(base + "/rest/v1/rpc/" + fn, {
+    rpc(fn, args = {}) {
+      return autenticado(() => fetch(base + "/rest/v1/rpc/" + fn, {
         method: "POST", headers: cab({ "Content-Profile": "app", "Accept-Profile": "app" }),
         body: JSON.stringify(args),
-      });
-      return leer(r);
+      }));
     },
-    async patch(rel, filtro, body) {
-      const r = await fetch(base + "/rest/v1/" + rel + "?" + filtro, {
+    patch(rel, filtro, body) {
+      return autenticado(() => fetch(base + "/rest/v1/" + rel + "?" + filtro, {
         method: "PATCH", headers: cab({ "Content-Profile": "app", Prefer: "return=minimal" }),
         body: JSON.stringify(body),
-      });
-      return leer(r);
+      }));
     },
   };
+}
+
+// Carga el perfil de app.perfiles del usuario autenticado y valida que esté activo.
+async function cargarPerfil(api, userId) {
+  const perf = await api.select("perfiles", "select=id,nombre,rol,activo&id=eq." + userId);
+  if (!perf?.[0]) throw new Error("Tu perfil no existe todavía. Pide al administrador que active tu cuenta.");
+  if (!perf[0].activo) throw new Error("Tu cuenta está desactivada.");
+  return perf[0];
 }
 
 const ROLES = ["admin", "gerencia", "jefe_compras", "comprador", "lectura"];
@@ -137,9 +188,9 @@ function Tabla({ cols, filas, vacio = "Sin datos." }) {
 
 /* ══════════════════════════ APP ══════════════════════════ */
 export default function App() {
-  const [cfg, setCfg] = useState({ url: "", anon: "" });
-  const [api, setApi] = useState(null);
+  const [api] = useState(() => crearApi(SUPABASE_URL, SUPABASE_ANON));
   const [yo, setYo] = useState(null);
+  const [restaurando, setRestaurando] = useState(true);
   const [tab, setTab] = useState("usuarios");
   const [msg, setMsg] = useState(null);
   const [ocupado, setOcupado] = useState(false);
@@ -151,7 +202,20 @@ export default function App() {
     finally { setOcupado(false); }
   }, []);
 
-  if (!api) return <Conexion onOk={(u, a) => { setCfg({ url: u, anon: a }); setApi(crearApi(u, a)); }} />;
+  // Al abrir: si hay sesión guardada y sigue válida, entra sin pedir contraseña.
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try { const u = await api.restaurar(); if (u && vivo) setYo(await cargarPerfil(api, u.id)); }
+      catch { await api.salir(); }
+      finally { if (vivo) setRestaurando(false); }
+    })();
+    return () => { vivo = false; };
+  }, [api]);
+
+  const salir = async () => { await api.salir(); setYo(null); };
+
+  if (restaurando) return <Pantalla titulo="Dashboard de Compras · Febeca" sub="Restaurando sesión…"><div className="flex items-center gap-2 text-xs text-slate-500"><Loader2 size={13} className="animate-spin" />Un momento</div></Pantalla>;
   if (!yo) return <Login api={api} onOk={setYo} />;
 
   const puedeGestionar = ["admin", "gerencia"].includes(yo.rol);
@@ -182,7 +246,7 @@ export default function App() {
                 <div className="grid h-7 w-7 place-items-center rounded-full text-xs font-bold text-white" style={{ background: "linear-gradient(135deg,#8b5cf6,#d946ef)" }}>{yo.nombre?.slice(0, 2).toUpperCase()}</div>
                 <div className="leading-tight"><div className="text-xs font-medium text-white">{yo.nombre}</div><div className="text-[11px] text-slate-500">{ROL_ET[yo.rol]}</div></div>
               </div>
-              <button onClick={() => { api.setToken(null); setYo(null); }} className="grid h-9 w-9 place-items-center rounded-full border border-slate-800 text-slate-400 hover:text-white"><LogOut size={15} /></button>
+              <button onClick={salir} title="Cerrar sesión" className="grid h-9 w-9 place-items-center rounded-full border border-slate-800 text-slate-400 hover:text-white"><LogOut size={15} /></button>
             </div>
           </div>
           <div className="mx-auto flex max-w-[1400px] gap-1 overflow-x-auto px-5 pb-2">
@@ -202,36 +266,22 @@ export default function App() {
           {tabActual === "jefaturas" && <Jefaturas {...ctx} />}
           {tabActual === "actividad" && <Actividad {...ctx} />}
           {tabActual === "equipo" && <Equipo {...ctx} />}
-          <p className="pt-6 text-center text-xs text-slate-700">{cfg.url}</p>
+          <p className="pt-6 text-center text-xs text-slate-700">{SUPABASE_URL}</p>
         </main>
       </div>
     </div>
   );
 }
 
-/* ══════════ Conexión y login ══════════ */
-function Conexion({ onOk }) {
-  const [u, setU] = useState(""); const [a, setA] = useState("");
-  return (
-    <Pantalla titulo="Conectar con Supabase" sub="Settings → API en tu proyecto">
-      <Campo l="Project URL"><input className={INPUT} value={u} onChange={(e) => setU(e.target.value)} placeholder="https://xxxx.supabase.co" /></Campo>
-      <Campo l="anon public key"><input className={INPUT} value={a} onChange={(e) => setA(e.target.value)} placeholder="eyJhbGciOi…" /></Campo>
-      <button className={BTN_P + " w-full"} disabled={!u || !a} onClick={() => onOk(u.trim(), a.trim())}>Continuar</button>
-      <Aviso>Recuerda agregar <b>app</b> a «Exposed schemas» en Settings → API. Sin eso, todas las consultas devuelven 404.</Aviso>
-    </Pantalla>
-  );
-}
+/* ══════════ Login ══════════ */
 function Login({ api, onOk }) {
   const [e, setE] = useState(""); const [p, setP] = useState(""); const [err, setErr] = useState(null); const [ld, setLd] = useState(false);
   const entrar = async () => {
     setLd(true); setErr(null);
     try {
       const d = await api.login(e.trim(), p);
-      const perf = await api.select("perfiles", "select=id,nombre,rol,activo&id=eq." + d.user.id);
-      if (!perf?.[0]) throw new Error("Tu perfil no existe todavía. Pide al administrador que active tu cuenta.");
-      if (!perf[0].activo) throw new Error("Tu cuenta está desactivada.");
-      onOk(perf[0]);
-    } catch (x) { setErr(x.message); } finally { setLd(false); }
+      onOk(await cargarPerfil(api, d.user.id));
+    } catch (x) { await api.salir(); setErr(x.message); } finally { setLd(false); }
   };
   return (
     <Pantalla titulo="Iniciar sesión" sub="Dashboard de Compras · Febeca">

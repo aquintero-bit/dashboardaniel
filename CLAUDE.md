@@ -15,7 +15,11 @@ Marca piloto: **PCP**. Usuarios: compradores, dos jefes de compras, gerencia, ad
 - **Base de datos:** Supabase (Postgres 16, Auth, RLS, Storage). Esquema `app`, no `public`.
 - **Frontend:** React + Tailwind + lucide-react + Recharts. Habla con Supabase por **REST puro
   (`fetch`)**, sin `@supabase/supabase-js` en el navegador. El cliente mínimo está en
-  `04-frontend/febeca-admin.jsx` → función `crearApi(url, anon)`.
+  `04-frontend/febeca-admin.jsx` → función `crearApi(url, anon)`. La URL del proyecto y la anon
+  key van fijas en las constantes `SUPABASE_URL` y `SUPABASE_ANON` del archivo (la anon key es
+  pública; RLS manda). La sesión se guarda en `localStorage` (`febeca.sesion`) y el cliente
+  renueva el token solo: antes de vencer y al recibir 401. Cerrar sesión llama a
+  `/auth/v1/logout`, que revoca el refresh token.
 - **Parseo de xlsx:** en el navegador con SheetJS (`xlsx`), en un Web Worker. Nunca en servidor.
 - **Pronósticos:** Holt-Winters en JS (ya implementado en `febeca-dashboard-inteligente.jsx`).
   Destino final: Edge Function disparada por webhook. Hoy corre en el cliente.
@@ -94,9 +98,14 @@ parámetros de las 10 RPC coinciden con las firmas reales, y los errores llegan 
 Hallazgo corregido: `reasignar_marca` tenía una sobrecarga vieja de 3 parámetros (migración
 002) que hacía que PostgREST devolviera 300 (PGRST203) al llamarla con 3 argumentos. Se
 elimina en el consolidado; prueba 24 vigila que no haya sobrecargas en `app`.
-**Falta**: probar en el navegador con usuarios de rol jefe_compras, comprador y lectura (solo
-existe el admin). Cuando se creen, verificar pestañas por rol y el flujo clasificar → asignar
-→ suplencia → feed.
+Probado también **en Chromium** como admin: abre directo en el login (ya no hay pantalla de
+conexión), entra, muestra las 6 pestañas, Marcas lista las 31, Jefaturas avisa los orígenes sin
+jefe, Actividad carga el feed, recarga sin pedir contraseña, con el token vencido renueva solo,
+y cerrar sesión limpia el almacenamiento. Sin errores de JS.
+**Falta**: probar con usuarios de rol jefe_compras, comprador y lectura (solo existe el admin).
+Cuando se creen, verificar pestañas por rol y el flujo clasificar → asignar → suplencia → feed.
+Para correr el módulo en local sin bundler propio: `esbuild` con `--jsx=automatic` y un
+`index.html` con el CDN de Tailwind bastan (React 18, xlsx 0.18, lucide-react).
 
 **Ojo con el registro de usuarios desde el módulo:** usa `/auth/v1/signup` y el proyecto
 tiene confirmación de correo activada (`mailer_autoconfirm = false`). El SMTP por defecto de
